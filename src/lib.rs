@@ -46,18 +46,18 @@ impl Request {
         try!(f.write(self.pid).map_err(LockError::io_error));
 
         return Ok(Lock {
-            pidfile: PidFile { pid: self.pid as uint },
+            pidfile: Pidfile { pid: self.pid as uint },
             handle: f,
             path: self.path
         })
     }
 
-    pub fn check(self) -> IoResult<bool> {
+    pub fn check(self) -> IoResult<Option<Pidfile>> {
         let mut f = match File::open(&self.path, false, false, 0) {
             Ok(v) => v,
             Err(e) => {
                 match e.kind {
-                    FileNotFound => return Ok(true),
+                    FileNotFound => return Ok(None),
                     _ => return Err(e)
                 }
             }
@@ -65,36 +65,43 @@ impl Request {
 
         let pid = try!(f.check());
 
-        Ok(pid == 0)
+        if pid == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(Pidfile { pid: pid as uint }))
     }
 }
 
 /// Represents a pidfile that exists at the requested location and has an
 /// active lock.
 #[deriving(Clone)]
-pub struct PidFile {
+pub struct Pidfile {
     pid: uint
 }
 
-impl PidFile {
+impl Pidfile {
     pub fn pid(&self) -> uint {
         self.pid
     }
 }
 
 pub struct Lock {
-    pidfile: PidFile,
+    pidfile: Pidfile,
+    path: Path,
+
+    #[allow(dead_code)]
     handle: File,
-    path: Path
 }
 
 impl Lock {
-    pub fn pidfile(&self) -> PidFile {
-        self.pidfile.clone()
+    pub fn pidfile(&self) -> Pidfile {
+        self.pidfile
     }
 }
 
 impl Drop for Lock {
+    #[allow(unused_must_use)]
     fn drop(&mut self) {
         // Some non-critical cleanup. We do not assume that the pidfile will
         // properly get cleaned up since this handler may not get executed.
@@ -124,7 +131,7 @@ impl LockError {
     }
 }
 
-type LockResult<T> = Result<T, LockError>;
+pub type LockResult<T> = Result<T, LockError>;
 
 fn pid() -> pid_t {
     unsafe { libc::getpid() }

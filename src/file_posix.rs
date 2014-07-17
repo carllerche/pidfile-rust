@@ -1,10 +1,11 @@
-use std::c_str::CString;
+#![allow(non_camel_case_types)]
+
 use std::io::{BufWriter, IoResult, IoError};
 use std::os::errno;
 use std::mem;
 use libc;
 use libc::{
-    c_void, c_int, c_short, pid_t,
+    c_void, c_int, c_short, pid_t, mode_t,
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
 use ffi::{
@@ -49,7 +50,7 @@ impl File {
         if write  { flags |= O_WRONLY; }
 
         // Open the file descriptor
-        let fd = check!(libc::open(path.to_c_str().as_ptr(), flags, mode as c_int));
+        let fd = check!(libc::open(path.to_c_str().as_ptr(), flags, mode as mode_t));
 
         // Set to close on exec
         check!(libc::fcntl(fd, F_SETFD, FD_CLOEXEC));
@@ -68,7 +69,6 @@ impl File {
         fl.l_type = F_WRLCK;
         fl.l_whence = SEEK_SET as c_short;
 
-        // TODO: Must return false on EACCES or EAGAIN
         let ret = check!(match libc::fcntl(self.fd, F_SETLK, &fl) {
             EACCES | EAGAIN => 1,
             v => v
@@ -96,10 +96,10 @@ impl File {
     pub fn write(&mut self, pid: pid_t) -> IoResult<()> {
         let mut buf: [u8, ..20] = unsafe { mem::zeroed() };
 
-        let mut len = {
+        let len = {
             let mut reader = BufWriter::new(buf);
 
-            let res = write!(&mut reader, "{}\n", pid);
+            try!(write!(&mut reader, "{}\n", pid));
             try!(reader.tell())
         };
 
@@ -116,7 +116,6 @@ impl File {
 
 impl Drop for File {
     fn drop(&mut self) {
-        // TODO: unlink the file
         unsafe { libc::close(self.fd); }
     }
 }
