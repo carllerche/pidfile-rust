@@ -14,6 +14,10 @@ use file::File;
 #[path = "ffi_darwin.rs"]
 mod ffi;
 
+#[cfg(target_os = "linux")]
+#[path = "ffi_linux.rs"]
+mod ffi;
+
 #[cfg(unix)]
 #[path = "file_posix.rs"]
 mod file;
