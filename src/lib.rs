@@ -115,8 +115,8 @@ impl Drop for Lock {
 
 #[deriving(Show)]
 pub struct LockError {
-    conflict: bool,
-    io: Option<IoError>,
+    pub conflict: bool,
+    pub io: Option<IoError>,
 }
 
 impl LockError {
