@@ -116,6 +116,7 @@ impl File {
 
 impl Drop for File {
     fn drop(&mut self) {
+        debug!("closing file");
         unsafe { libc::close(self.fd); }
     }
 }

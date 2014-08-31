@@ -1,7 +1,11 @@
 #![crate_name = "pidfile"]
 #![feature(macro_rules)]
+#![feature(phase)]
 
 extern crate libc;
+
+#[phase(plugin, link)]
+extern crate log;
 
 use std::io::{FilePermission, IoResult, IoError, FileNotFound};
 use std::io::fs;
@@ -49,6 +53,8 @@ impl Request {
         try!(f.truncate().map_err(LockError::io_error));
         try!(f.write(self.pid).map_err(LockError::io_error));
 
+        debug!("lock acquired");
+
         return Ok(Lock {
             pidfile: Pidfile { pid: self.pid as uint },
             handle: f,
@@ -57,12 +63,19 @@ impl Request {
     }
 
     pub fn check(self) -> IoResult<Option<Pidfile>> {
+        debug!("checking for lock");
         let mut f = match File::open(&self.path, false, false, 0) {
             Ok(v) => v,
             Err(e) => {
                 match e.kind {
-                    FileNotFound => return Ok(None),
-                    _ => return Err(e)
+                    FileNotFound => {
+                        debug!("no lock acquired -- file not found");
+                        return Ok(None)
+                    },
+                    _ => {
+                        debug!("error checking for lock; err={}", e);
+                        return Err(e)
+                    }
                 }
             }
         };
@@ -70,8 +83,11 @@ impl Request {
         let pid = try!(f.check());
 
         if pid == 0 {
+            debug!("no lock acquired -- file exists");
             return Ok(None);
         }
+
+        debug!("lock acquired; pid={}", pid);
 
         Ok(Some(Pidfile { pid: pid as uint }))
     }
