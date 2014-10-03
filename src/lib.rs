@@ -13,8 +13,7 @@ use std::path::{BytesContainer, Path};
 use libc::pid_t;
 use file::File;
 
-#[cfg(target_os = "macos")]
-#[cfg(target_os = "ios")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 #[path = "ffi_darwin.rs"]
 mod ffi;
 
