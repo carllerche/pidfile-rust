@@ -24,6 +24,8 @@ macro_rules! check(
         loop {
             ret = unsafe { $expr };
 
+            debug!("ffi; expr={}; ret={}", stringify!($expr), ret);
+
             if ret < 0 {
                 let err = errno() as c_int;
 
@@ -41,6 +43,19 @@ macro_rules! check(
         ret
     })
 )
+
+unsafe fn setlk(fd: c_int, fl: &flock) -> c_int {
+    let ret = libc::fcntl(fd, F_SETLK, fl as *const flock);
+
+    if ret < 0 {
+        match errno() as c_int {
+            EACCES | EAGAIN => return 1,
+            _ => {}
+        }
+    }
+
+    ret
+}
 
 impl File {
     pub fn open(path: &Path, create: bool, write: bool, mode: u32) -> IoResult<File> {
@@ -69,10 +84,7 @@ impl File {
         fl.l_type = F_WRLCK;
         fl.l_whence = SEEK_SET as c_short;
 
-        let ret = check!(match libc::fcntl(self.fd, F_SETLK, &fl) {
-            EACCES | EAGAIN => 1,
-            v => v
-        });
+        let ret = check!(setlk(self.fd, &fl));
 
         Ok(ret == 0)
     }
@@ -83,7 +95,7 @@ impl File {
         fl.l_type = F_WRLCK;
         fl.l_whence = SEEK_SET as c_short;
 
-        check!(libc::fcntl(self.fd, F_GETLK, &fl));
+        check!(libc::fcntl(self.fd, F_GETLK, &fl as *const flock));
 
         if fl.l_type == F_UNLCK {
             Ok(0)
