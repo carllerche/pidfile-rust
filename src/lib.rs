@@ -3,14 +3,17 @@
 #![feature(phase)]
 
 extern crate libc;
+extern crate nix;
 
 #[phase(plugin, link)]
 extern crate log;
 
+use std::fmt;
 use std::io::{FilePermission, IoResult, IoError, FileNotFound};
-use std::io::fs;
 use std::path::{BytesContainer, Path};
+use std::from_str::FromStr;
 use libc::pid_t;
+use nix::sys::stat::stat;
 use file::File;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -46,13 +49,16 @@ impl Request {
         let mut f = try!(res.map_err(LockError::io_error));
 
         if !try!(f.lock().map_err(LockError::io_error)) {
+            debug!("lock not acquired; conflict");
             return Err(LockError::conflict());
         }
+
+        debug!("lock acquired");
 
         try!(f.truncate().map_err(LockError::io_error));
         try!(f.write(self.pid).map_err(LockError::io_error));
 
-        debug!("lock acquired");
+        debug!("lockfile written");
 
         return Ok(Lock {
             pidfile: Pidfile { pid: self.pid as uint },
@@ -94,7 +100,7 @@ impl Request {
 
 /// Represents a pidfile that exists at the requested location and has an
 /// active lock.
-#[deriving(Clone)]
+#[deriving(Clone, Show)]
 pub struct Pidfile {
     pid: uint
 }
@@ -108,7 +114,6 @@ impl Pidfile {
 pub struct Lock {
     pidfile: Pidfile,
     path: Path,
-
     #[allow(dead_code)]
     handle: File,
 }
@@ -117,14 +122,44 @@ impl Lock {
     pub fn pidfile(&self) -> Pidfile {
         self.pidfile
     }
-}
 
-impl Drop for Lock {
-    #[allow(unused_must_use)]
-    fn drop(&mut self) {
-        // Some non-critical cleanup. We do not assume that the pidfile will
-        // properly get cleaned up since this handler may not get executed.
-        fs::unlink(&self.path);
+    pub fn ensure_current(&self) -> Result<(), Option<uint>> {
+        // 1. stat the current fd
+        //    - if error, try to read the pid, if it exists
+        //      - if success, return Err(Some(new_pid))
+        //      - otherwise, return Err(None)
+        // 2. stat the path
+        //    - if error, return Err(None)
+        // 3. compare the inodes in the two stat results
+        //    - if same, return Ok(())
+        //    - otherwise, try to read the pid
+        //      - if success, return Err(Some(new_pid))
+        //      - otherwise, return Err(None)
+        //
+
+        let current_stat = match self.handle.stat() {
+            Err(_) => return Err(self.read_pid()),
+            Ok(stat) => stat
+        };
+
+        let path_stat = try!(stat(&self.path).map_err(|_| None));
+
+        if current_stat.st_ino == path_stat.st_ino {
+            Ok(())
+        } else {
+            Err(self.read_pid())
+        }
+    }
+
+    fn read_pid(&self) -> Option<uint> {
+        let mut f = std::io::File::open(&self.path);
+
+        let s = match f.read_to_string() {
+            Ok(val) => val,
+            Err(_) => return None
+        };
+
+        s.as_slice().lines().nth(0).and_then(|l| FromStr::from_str(l))
     }
 }
 
@@ -147,6 +182,12 @@ impl LockError {
             conflict: false,
             io: Some(err)
         }
+    }
+}
+
+impl fmt::Show for Lock {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Lock {{ pidfile: {}, path: {} }}", self.pidfile, self.path.display())
     }
 }
 
