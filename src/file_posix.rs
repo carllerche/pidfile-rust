@@ -5,7 +5,7 @@ use std::os::errno;
 use std::mem;
 use libc;
 use libc::{
-    c_void, c_int, c_short, pid_t, mode_t,
+    c_void, c_int, c_short, pid_t, mode_t, size_t,
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
 use nix::sys::stat;
@@ -121,7 +121,8 @@ impl File {
 
         while pos < len {
             let ptr = unsafe { buf.as_ptr().offset(pos as int) };
-            pos += check!(libc::write(self.fd, ptr as *const c_void, len - pos)) as u64;
+            let ret = check!(libc::write(self.fd, ptr as *const c_void, (len - pos) as size_t));
+            pos += ret as u64;
         }
 
         Ok(())
