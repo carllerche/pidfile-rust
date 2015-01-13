@@ -2,6 +2,7 @@
 
 use std::io::{BufWriter, IoResult, IoError};
 use std::os::errno;
+use std::ffi::CString;
 use std::mem;
 use libc;
 use libc::{
@@ -19,7 +20,7 @@ pub struct File {
     fd: c_int
 }
 
-macro_rules! check(
+macro_rules! check {
     ($expr:expr) => ({
         let mut ret;
 
@@ -35,7 +36,7 @@ macro_rules! check(
                     continue;
                 }
 
-                return Err(IoError::from_errno(err as uint, false));
+                return Err(IoError::from_errno(err as usize, false));
             }
             else {
                 break;
@@ -44,7 +45,7 @@ macro_rules! check(
 
         ret
     })
-)
+}
 
 unsafe fn setlk(fd: c_int, fl: &flock) -> c_int {
     let ret = libc::fcntl(fd, F_SETLK, fl as *const flock);
@@ -67,7 +68,7 @@ impl File {
         if write  { flags |= O_WRONLY; }
 
         // Open the file descriptor
-        let fd = check!(libc::open(path.to_c_str().as_ptr(), flags, mode as mode_t));
+        let fd = check!(libc::open(CString::from_slice(path.as_vec()).as_ptr(), flags, mode as mode_t));
 
         // Set to close on exec
         check!(libc::fcntl(fd, F_SETFD, FD_CLOEXEC));
@@ -108,10 +109,10 @@ impl File {
     }
 
     pub fn write(&mut self, pid: pid_t) -> IoResult<()> {
-        let mut buf: [u8, ..20] = unsafe { mem::zeroed() };
+        let mut buf: [u8; 20] = unsafe { mem::zeroed() };
 
         let len = {
-            let mut reader = BufWriter::new(buf);
+            let mut reader = BufWriter::new(buf.as_mut_slice());
 
             try!(write!(&mut reader, "{}\n", pid));
             try!(reader.tell())
@@ -120,7 +121,7 @@ impl File {
         let mut pos = 0;
 
         while pos < len {
-            let ptr = unsafe { buf.as_ptr().offset(pos as int) };
+            let ptr = unsafe { buf.as_ptr().offset(pos as isize) };
             let ret = check!(libc::write(self.fd, ptr as *const c_void, (len - pos) as size_t));
             pos += ret as u64;
         }

@@ -1,17 +1,16 @@
 #![crate_name = "pidfile"]
-#![feature(macro_rules)]
-#![feature(phase)]
+#![allow(unstable)]
 
 extern crate libc;
 extern crate nix;
 
-#[phase(plugin, link)]
+#[macro_use]
 extern crate log;
 
 use std::fmt;
 use std::io::{FilePermission, IoResult, IoError, FileNotFound};
 use std::path::{BytesContainer, Path};
-use std::from_str::FromStr;
+use std::str::FromStr;
 use libc::pid_t;
 use nix::sys::stat::stat;
 use file::File;
@@ -61,7 +60,7 @@ impl Request {
         debug!("lockfile written");
 
         return Ok(Lock {
-            pidfile: Pidfile { pid: self.pid as uint },
+            pidfile: Pidfile { pid: self.pid as u32 },
             handle: f,
             path: self.path
         })
@@ -94,19 +93,19 @@ impl Request {
 
         debug!("lock acquired; pid={}", pid);
 
-        Ok(Some(Pidfile { pid: pid as uint }))
+        Ok(Some(Pidfile { pid: pid as u32 }))
     }
 }
 
 /// Represents a pidfile that exists at the requested location and has an
 /// active lock.
-#[deriving(Clone, Show)]
+#[derive(Clone, Show, Copy)]
 pub struct Pidfile {
-    pid: uint
+    pid: u32
 }
 
 impl Pidfile {
-    pub fn pid(&self) -> uint {
+    pub fn pid(&self) -> u32 {
         self.pid
     }
 }
@@ -123,7 +122,7 @@ impl Lock {
         self.pidfile
     }
 
-    pub fn ensure_current(&self) -> Result<(), Option<uint>> {
+    pub fn ensure_current(&self) -> Result<(), Option<u32>> {
         // 1. stat the current fd
         //    - if error, try to read the pid, if it exists
         //      - if success, return Err(Some(new_pid))
@@ -151,7 +150,7 @@ impl Lock {
         }
     }
 
-    fn read_pid(&self) -> Option<uint> {
+    fn read_pid(&self) -> Option<u32> {
         let mut f = std::io::File::open(&self.path);
 
         let s = match f.read_to_string() {
@@ -163,7 +162,7 @@ impl Lock {
     }
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct LockError {
     pub conflict: bool,
     pub io: Option<IoError>,
@@ -187,7 +186,7 @@ impl LockError {
 
 impl fmt::Show for Lock {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Lock {{ pidfile: {}, path: {} }}", self.pidfile, self.path.display())
+        write!(fmt, "Lock {{ pidfile: {:?}, path: {:?} }}", self.pidfile, self.path)
     }
 }
 
