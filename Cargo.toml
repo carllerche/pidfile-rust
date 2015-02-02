@@ -6,3 +6,6 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies.nix]
 git = "https://github.com/carllerche/nix-rust.git"
+
+[dependencies]
+log = "0.2.1"

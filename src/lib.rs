@@ -1,5 +1,10 @@
 #![crate_name = "pidfile"]
-#![allow(unstable)]
+#![feature(core)]
+#![feature(io)]
+#![feature(path)]
+#![feature(libc)]
+#![feature(os)]
+#![feature(std_misc)]
 
 extern crate libc;
 extern crate nix;
@@ -8,7 +13,7 @@ extern crate nix;
 extern crate log;
 
 use std::fmt;
-use std::io::{FilePermission, IoResult, IoError, FileNotFound};
+use std::old_io::{FilePermission, IoResult, IoError, FileNotFound};
 use std::path::{BytesContainer, Path};
 use std::str::FromStr;
 use libc::pid_t;
@@ -99,7 +104,7 @@ impl Request {
 
 /// Represents a pidfile that exists at the requested location and has an
 /// active lock.
-#[derive(Clone, Show, Copy)]
+#[derive(Clone, Debug, Copy)]
 pub struct Pidfile {
     pid: u32
 }
@@ -151,7 +156,7 @@ impl Lock {
     }
 
     fn read_pid(&self) -> Option<u32> {
-        let mut f = std::io::File::open(&self.path);
+        let mut f = std::old_io::File::open(&self.path);
 
         let s = match f.read_to_string() {
             Ok(val) => val,
@@ -162,7 +167,7 @@ impl Lock {
     }
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct LockError {
     pub conflict: bool,
     pub io: Option<IoError>,
@@ -184,7 +189,7 @@ impl LockError {
     }
 }
 
-impl fmt::Show for Lock {
+impl fmt::Debug for Lock {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Lock {{ pidfile: {:?}, path: {:?} }}", self.pidfile, self.path)
     }

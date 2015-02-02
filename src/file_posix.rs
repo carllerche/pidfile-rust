@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use std::io::{BufWriter, IoResult, IoError};
+use std::old_io::{BufWriter, IoResult, IoError};
 use std::os::errno;
 use std::ffi::CString;
 use std::mem;
