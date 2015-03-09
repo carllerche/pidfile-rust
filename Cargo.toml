@@ -4,5 +4,8 @@ name = "pidfile"
 version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
+[dependencies]
+log = "0.2.5"
+
 [dependencies.nix]
-git = "https://github.com/carllerche/nix-rust.git"
+git = "https://github.com/carllerche/nix-rust"

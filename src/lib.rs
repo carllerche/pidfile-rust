@@ -1,5 +1,5 @@
 #![crate_name = "pidfile"]
-#![allow(unstable)]
+#![feature(io, os, libc, path, std_misc)]
 
 extern crate libc;
 extern crate nix;
@@ -7,13 +7,14 @@ extern crate nix;
 #[macro_use]
 extern crate log;
 
-use std::fmt;
-use std::io::{FilePermission, IoResult, IoError, FileNotFound};
-use std::path::{BytesContainer, Path};
-use std::str::FromStr;
+use file::File;
 use libc::pid_t;
 use nix::sys::stat::stat;
-use file::File;
+use std::{fmt, io};
+use std::io::Read;
+use std::ffi::AsOsStr;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[path = "ffi_darwin.rs"]
@@ -27,24 +28,23 @@ mod ffi;
 #[path = "file_posix.rs"]
 mod file;
 
-pub fn at<B: BytesContainer>(path: B) -> Request {
+pub fn at<S: ?Sized + AsOsStr>(path: &S) -> Request {
     Request {
         pid: pid(),
-        path: Path::new(path),
-        perm: FilePermission::from_bits(0o644)
-            .expect("0o644 is not a valid file permission")
+        path: PathBuf::new(path),
+        perm: 0o644,
     }
 }
 
 pub struct Request {
     pid: pid_t,
-    path: Path,
-    perm: FilePermission
+    path: PathBuf,
+    perm: u32,
 }
 
 impl Request {
     pub fn lock(self) -> LockResult<Lock> {
-        let res = File::open(&self.path, true, true, self.perm.bits());
+        let res = File::open(&*self.path, true, true, self.perm);
         let mut f = try!(res.map_err(LockError::io_error));
 
         if !try!(f.lock().map_err(LockError::io_error)) {
@@ -66,13 +66,13 @@ impl Request {
         })
     }
 
-    pub fn check(self) -> IoResult<Option<Pidfile>> {
+    pub fn check(self) -> io::Result<Option<Pidfile>> {
         debug!("checking for lock");
         let mut f = match File::open(&self.path, false, false, 0) {
             Ok(v) => v,
             Err(e) => {
-                match e.kind {
-                    FileNotFound => {
+                match e.kind() {
+                    io::ErrorKind::FileNotFound => {
                         debug!("no lock acquired -- file not found");
                         return Ok(None)
                     },
@@ -99,7 +99,7 @@ impl Request {
 
 /// Represents a pidfile that exists at the requested location and has an
 /// active lock.
-#[derive(Clone, Show, Copy)]
+#[derive(Clone, Debug, Copy)]
 pub struct Pidfile {
     pid: u32
 }
@@ -112,7 +112,7 @@ impl Pidfile {
 
 pub struct Lock {
     pidfile: Pidfile,
-    path: Path,
+    path: PathBuf,
     #[allow(dead_code)]
     handle: File,
 }
@@ -141,7 +141,7 @@ impl Lock {
             Ok(stat) => stat
         };
 
-        let path_stat = try!(stat(&self.path).map_err(|_| None));
+        let path_stat = try!(stat(&*self.path).map_err(|_| None));
 
         if current_stat.st_ino == path_stat.st_ino {
             Ok(())
@@ -151,21 +151,23 @@ impl Lock {
     }
 
     fn read_pid(&self) -> Option<u32> {
-        let mut f = std::io::File::open(&self.path);
+        if let Ok(mut f) = std::fs::File::open(&self.path) {
+            let mut s = String::new();
 
-        let s = match f.read_to_string() {
-            Ok(val) => val,
-            Err(_) => return None
-        };
+            if let Ok(_) = f.read_to_string(&mut s) {
+                return s.lines().nth(0)
+                    .and_then(|s| FromStr::from_str(s).ok())
+            }
+        }
 
-        s.as_slice().lines().nth(0).and_then(|l| FromStr::from_str(l))
+        None
     }
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct LockError {
     pub conflict: bool,
-    pub io: Option<IoError>,
+    pub io: Option<io::Error>,
 }
 
 impl LockError {
@@ -176,7 +178,7 @@ impl LockError {
         }
     }
 
-    fn io_error(err: IoError) -> LockError {
+    fn io_error(err: io::Error) -> LockError {
         LockError {
             conflict: false,
             io: Some(err)
@@ -184,7 +186,7 @@ impl LockError {
     }
 }
 
-impl fmt::Show for Lock {
+impl fmt::Debug for Lock {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         write!(fmt, "Lock {{ pidfile: {:?}, path: {:?} }}", self.pidfile, self.path)
     }

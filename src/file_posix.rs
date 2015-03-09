@@ -1,16 +1,18 @@
 #![allow(non_camel_case_types)]
 
-use std::io::{BufWriter, IoResult, IoError};
+use std::{io, mem};
+use std::io::Write;
 use std::os::errno;
-use std::ffi::CString;
-use std::mem;
+use std::ffi::AsOsStr;
+use std::path::Path;
+use std::os::unix::OsStrExt;
 use libc;
 use libc::{
     c_void, c_int, c_short, pid_t, mode_t, size_t,
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
 use nix::sys::stat;
-use nix::SysResult;
+use nix::NixResult;
 use ffi::{
     flock, O_SYNC, F_SETFD, F_GETLK,
     F_SETLK, F_WRLCK, F_UNLCK, FD_CLOEXEC
@@ -36,7 +38,7 @@ macro_rules! check {
                     continue;
                 }
 
-                return Err(IoError::from_errno(err as usize, false));
+                return Err(io::Error::from_os_error(err));
             }
             else {
                 break;
@@ -61,14 +63,16 @@ unsafe fn setlk(fd: c_int, fl: &flock) -> c_int {
 }
 
 impl File {
-    pub fn open(path: &Path, create: bool, write: bool, mode: u32) -> IoResult<File> {
+    pub fn open(path: &Path, create: bool, write: bool, mode: u32) -> io::Result<File> {
         let mut flags = O_SYNC;
 
         if create { flags |= O_CREAT;  }
         if write  { flags |= O_WRONLY; }
 
+        let ptr = path.as_os_str().as_bytes().as_ptr() as *const i8;
+
         // Open the file descriptor
-        let fd = check!(libc::open(CString::from_slice(path.as_vec()).as_ptr(), flags, mode as mode_t));
+        let fd = check!(libc::open(ptr, flags, mode as mode_t));
 
         // Set to close on exec
         check!(libc::fcntl(fd, F_SETFD, FD_CLOEXEC));
@@ -76,12 +80,12 @@ impl File {
         return Ok(File { fd: fd });
     }
 
-    pub fn truncate(&mut self) -> IoResult<()> {
+    pub fn truncate(&mut self) -> io::Result<()> {
         check!(libc::ftruncate(self.fd, 0));
         Ok(())
     }
 
-    pub fn lock(&mut self) -> IoResult<bool> {
+    pub fn lock(&mut self) -> io::Result<bool> {
         let mut fl: flock = unsafe { mem::zeroed() };
 
         fl.l_type = F_WRLCK;
@@ -92,7 +96,7 @@ impl File {
         Ok(ret == 0)
     }
 
-    pub fn check(&mut self) -> IoResult<pid_t> {
+    pub fn check(&mut self) -> io::Result<pid_t> {
         let mut fl: flock = unsafe { mem::zeroed() };
 
         fl.l_type = F_WRLCK;
@@ -108,14 +112,14 @@ impl File {
         }
     }
 
-    pub fn write(&mut self, pid: pid_t) -> IoResult<()> {
+    pub fn write(&mut self, pid: pid_t) -> io::Result<()> {
         let mut buf: [u8; 20] = unsafe { mem::zeroed() };
 
         let len = {
-            let mut reader = BufWriter::new(buf.as_mut_slice());
+            let mut reader = io::Cursor::new(buf.as_mut_slice());
 
             try!(write!(&mut reader, "{}\n", pid));
-            try!(reader.tell())
+            reader.position()
         };
 
         let mut pos = 0;
@@ -129,7 +133,7 @@ impl File {
         Ok(())
     }
 
-    pub fn stat(&self) -> SysResult<stat::FileStat> {
+    pub fn stat(&self) -> NixResult<stat::FileStat> {
         stat::fstat(self.fd)
     }
 }
