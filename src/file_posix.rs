@@ -2,15 +2,15 @@
 
 use std::{io, mem};
 use std::io::Write;
-use std::os::errno;
 use std::ffi::AsOsStr;
 use std::path::Path;
-use std::os::unix::OsStrExt;
+use std::os::unix::ffi::OsStrExt;
 use libc;
 use libc::{
     c_void, c_int, c_short, pid_t, mode_t, size_t,
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
+use nix::errno::errno;
 use nix::sys::stat;
 use nix::NixResult;
 use ffi::{

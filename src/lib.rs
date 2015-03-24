@@ -1,5 +1,5 @@
 #![crate_name = "pidfile"]
-#![feature(io, os, libc, path, std_misc)]
+#![feature(io, libc, std_misc)]
 
 extern crate libc;
 extern crate nix;
@@ -72,7 +72,7 @@ impl Request {
             Ok(v) => v,
             Err(e) => {
                 match e.kind() {
-                    io::ErrorKind::FileNotFound => {
+                    io::ErrorKind::NotFound => {
                         debug!("no lock acquired -- file not found");
                         return Ok(None)
                     },
