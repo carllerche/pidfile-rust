@@ -10,9 +10,9 @@ use libc::{
     c_void, c_int, c_short, pid_t, mode_t, size_t,
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
+use nix;
 use nix::errno::errno;
 use nix::sys::stat;
-use nix::NixResult;
 use ffi::{
     flock, O_SYNC, F_SETFD, F_GETLK,
     F_SETLK, F_WRLCK, F_UNLCK, FD_CLOEXEC
@@ -133,7 +133,7 @@ impl File {
         Ok(())
     }
 
-    pub fn stat(&self) -> NixResult<stat::FileStat> {
+    pub fn stat(&self) -> nix::Result<stat::FileStat> {
         stat::fstat(self.fd)
     }
 }
