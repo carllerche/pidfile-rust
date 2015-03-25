@@ -1,5 +1,5 @@
 #![crate_name = "pidfile"]
-#![feature(io, libc, std_misc)]
+#![feature(convert, io, libc, std_misc)]
 
 extern crate libc;
 extern crate nix;
@@ -12,8 +12,7 @@ use libc::pid_t;
 use nix::sys::stat::stat;
 use std::{fmt, io};
 use std::io::Read;
-use std::ffi::AsOsStr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -28,10 +27,10 @@ mod ffi;
 #[path = "file_posix.rs"]
 mod file;
 
-pub fn at<S: ?Sized + AsOsStr>(path: &S) -> Request {
+pub fn at<S: AsRef<Path>>(path: &S) -> Request {
     Request {
         pid: pid(),
-        path: PathBuf::new(path),
+        path: PathBuf::from(path.as_ref()),
         perm: 0o644,
     }
 }
