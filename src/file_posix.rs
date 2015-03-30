@@ -116,7 +116,7 @@ impl File {
         let mut buf: [u8; 20] = unsafe { mem::zeroed() };
 
         let len = {
-            let mut reader = io::Cursor::new(buf.as_mut_slice());
+            let mut reader = io::Cursor::new(&mut buf[..]);
 
             try!(write!(&mut reader, "{}\n", pid));
             reader.position()
