@@ -1,5 +1,5 @@
 #![crate_name = "pidfile"]
-#![feature(convert, io, libc, std_misc)]
+#![feature(convert, libc, std_misc)]
 
 extern crate libc;
 extern crate nix;

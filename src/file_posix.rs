@@ -38,7 +38,7 @@ macro_rules! check {
                     continue;
                 }
 
-                return Err(io::Error::from_os_error(err));
+                return Err(io::Error::from_raw_os_error(err));
             }
             else {
                 break;
