@@ -1,10 +1,9 @@
 #![allow(non_camel_case_types)]
 
 use std::{io, mem};
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::ffi::AsOsStr;
 use std::path::Path;
-use std::os::unix::ffi::OsStrExt;
 use libc;
 use libc::{
     c_void, c_int, c_short, pid_t, mode_t, size_t,
@@ -69,7 +68,11 @@ impl File {
         if create { flags |= O_CREAT;  }
         if write  { flags |= O_WRONLY; }
 
-        let ptr = path.as_os_str().as_bytes().as_ptr() as *const i8;
+        let ptr = if let Some(path_string) = path.as_os_str().to_cstring() {
+            path_string.as_bytes_with_nul().as_ptr() as *const i8
+        } else {
+            return Err(io::Error::new(ErrorKind::Other, "Could not convert path to c_str"));
+        };
 
         // Open the file descriptor
         let fd = check!(libc::open(ptr, flags, mode as mode_t));
