@@ -2,7 +2,6 @@
 
 use std::{io, mem};
 use std::io::Write;
-use std::ffi::AsOsStr;
 use std::path::Path;
 use std::os::unix::ffi::OsStrExt;
 use libc;
@@ -38,7 +37,7 @@ macro_rules! check {
                     continue;
                 }
 
-                return Err(io::Error::from_raw_os_error(err));
+                return Err(from_raw_os_error(err));
             }
             else {
                 break;
@@ -142,5 +141,20 @@ impl Drop for File {
     fn drop(&mut self) {
         debug!("closing file");
         unsafe { libc::close(self.fd); }
+    }
+}
+
+fn from_raw_os_error(err: i32) -> io::Error {
+    use std::mem;
+    // TODO: Remove insane hacks once `std::io::Error::from_os_error` lands
+    //       rust-lang/rust#24028
+    #[allow(dead_code)]
+    enum Repr {
+        Os(i32),
+        Custom(*const ()),
+    }
+
+    unsafe {
+        mem::transmute(Repr::Os(err))
     }
 }
