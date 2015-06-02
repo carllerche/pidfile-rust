@@ -26,7 +26,7 @@ mod ffi;
 #[path = "file_posix.rs"]
 mod file;
 
-pub fn at<S: AsRef<Path>>(path: &S) -> Request {
+pub fn at<S: AsRef<Path> + ?Sized>(path: &S) -> Request {
     Request {
         pid: pid(),
         path: PathBuf::from(path.as_ref()),
