@@ -10,7 +10,8 @@ use libc::{
     O_CREAT, O_WRONLY, SEEK_SET, EINTR, EACCES, EAGAIN
 };
 use nix;
-use nix::errno::errno;
+use nix::errno::{Errno, errno};
+use nix::fcntl::{self, open};
 use nix::sys::stat;
 use ffi::{
     flock, O_SYNC, F_SETFD, F_GETLK,
@@ -33,6 +34,8 @@ macro_rules! check {
             if ret < 0 {
                 let err = errno() as c_int;
 
+                debug!("errno={}", err);
+
                 if err == EINTR {
                     continue;
                 }
@@ -41,6 +44,34 @@ macro_rules! check {
             }
             else {
                 break;
+            }
+        }
+
+        ret
+    })
+}
+
+macro_rules! nix_check {
+    ($expr:expr) => ({
+        let mut ret;
+
+        loop {
+            let res = unsafe { $expr };
+
+            debug!("ffi; expr={}; success={}", stringify!($expr), res.is_ok());
+
+            match res {
+                Ok(v) => {
+                    ret = v;
+                    break;
+                }
+                Err(e) => {
+                    if e.errno() == Errno::EINTR {
+                        continue;
+                    }
+
+                    return Err(from_raw_os_error(e.errno() as c_int));
+                }
             }
         }
 
@@ -63,15 +94,13 @@ unsafe fn setlk(fd: c_int, fl: &flock) -> c_int {
 
 impl File {
     pub fn open(path: &Path, create: bool, write: bool, mode: u32) -> io::Result<File> {
-        let mut flags = O_SYNC;
+        let mut flags = fcntl::O_SYNC;
 
-        if create { flags |= O_CREAT;  }
-        if write  { flags |= O_WRONLY; }
-
-        let ptr = path.as_os_str().as_bytes().as_ptr() as *const i8;
+        if create { flags = flags | fcntl::O_CREAT;  }
+        if write  { flags = flags | fcntl::O_WRONLY; }
 
         // Open the file descriptor
-        let fd = check!(libc::open(ptr, flags, mode as mode_t));
+        let fd = nix_check!(open(path, flags, stat::Mode::from_bits(mode as mode_t).unwrap()));
 
         // Set to close on exec
         check!(libc::fcntl(fd, F_SETFD, FD_CLOEXEC));
