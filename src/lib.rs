@@ -1,7 +1,11 @@
+//! Crate allows to lock a pidfile for a process to prevent another from
+//! starting as long the lock is held.
+
 #![crate_name = "pidfile"]
 
 extern crate libc;
 extern crate nix;
+extern crate tempdir;
 
 #[macro_use]
 extern crate log;
@@ -194,4 +198,31 @@ pub type LockResult<T> = Result<T, LockError>;
 
 fn pid() -> pid_t {
     unsafe { libc::getpid() }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn main() {
+        use at;
+        use tempdir::TempDir;
+        use std::fs::File;
+
+        let p = TempDir::new("").expect("create temp dir");
+
+        assert!(p.path().exists());
+
+        let p = p.path().join("pidfile");
+
+        match File::create(&p) {
+            Ok(_) => { },
+            Err(e) => panic!(format!("cannot create tmp file in {:?} with {:?}",p,&e)),
+        }
+
+        match at(&p).lock() {
+            Ok(_) => { },
+            Err(e) => panic!(format!("cannot lock in {:?} on start with {:?}",p,&e)),
+        }
+    }
 }

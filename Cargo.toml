@@ -7,6 +7,7 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 [dependencies]
 log = "0.3.0"
 libc = "0.1.6"
+tempdir = "*"
 
 [dependencies.nix]
 git = "https://github.com/carllerche/nix-rust"
