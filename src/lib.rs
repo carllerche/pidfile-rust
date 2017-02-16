@@ -205,6 +205,7 @@ mod tests {
 
     #[test]
     fn main() {
+		use std::thread;
         use at;
         use tempdir::TempDir;
         use std::fs::File;
@@ -215,14 +216,26 @@ mod tests {
 
         let p = p.path().join("pidfile");
 
-        match File::create(&p) {
-            Ok(_) => { },
-            Err(e) => panic!(format!("cannot create tmp file in {:?} with {:?}",p,&e)),
-        }
+		// run couple threads
 
-        match at(&p).lock() {
-            Ok(_) => { },
-            Err(e) => panic!(format!("cannot lock in {:?} on start with {:?}",p,&e)),
-        }
+		let allcan = (0 .. 3)
+			.map(|_| {
+                let pc = p.clone();
+				let atit = move || {
+					at(&pc).lock()
+				};
+
+				thread::spawn(atit)
+			})
+			.collect::<Vec<_>>()
+			.into_iter()
+			.map(|t| t.join())
+			.collect::<Vec<_>>()
+            .into_iter()
+            .all(|v| v.is_ok());
+
+		assert!(allcan);
+
+
     }
 }
