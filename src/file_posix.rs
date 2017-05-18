@@ -56,7 +56,7 @@ macro_rules! nix_check {
         let mut ret;
 
         loop {
-            let res = unsafe { $expr };
+            let res = $expr;
 
             debug!("ffi; expr={}; success={}", stringify!($expr), res.is_ok());
 

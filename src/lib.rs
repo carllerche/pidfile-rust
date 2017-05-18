@@ -1,7 +1,11 @@
+//! Crate allows to lock a pidfile for a process to prevent another from
+//! starting as long the lock is held.
+
 #![crate_name = "pidfile"]
 
 extern crate libc;
 extern crate nix;
+extern crate tempdir;
 
 #[macro_use]
 extern crate log;
@@ -14,7 +18,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
 #[path = "ffi_darwin.rs"]
 mod ffi;
 
@@ -194,4 +198,43 @@ pub type LockResult<T> = Result<T, LockError>;
 
 fn pid() -> pid_t {
     unsafe { libc::getpid() }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn main() {
+		use std::thread;
+        use at;
+        use tempdir::TempDir;
+
+        let p = TempDir::new("").expect("create temp dir");
+
+        assert!(p.path().exists());
+
+        let p = p.path().join("pidfile");
+
+		// run couple threads
+
+		let allcan = (0 .. 3)
+			.map(|_| {
+                let pc = p.clone();
+				let atit = move || {
+					at(&pc).lock()
+				};
+
+				thread::spawn(atit)
+			})
+			.collect::<Vec<_>>()
+			.into_iter()
+			.map(|t| t.join())
+			.collect::<Vec<_>>()
+            .into_iter()
+            .all(|v| v.is_ok());
+
+		assert!(allcan);
+
+
+    }
 }

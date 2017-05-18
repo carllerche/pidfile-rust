@@ -1,3 +1,3 @@
 # Pidfile for Rust
 
-Daemon mutual exclusion
+Daemon mutual exclusion via a PID file

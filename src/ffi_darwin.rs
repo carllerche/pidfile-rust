@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use libc::{off_t, pid_t, c_int, c_short};
-pub use libc::consts::os::extra::O_SYNC;
+pub use libc::O_SYNC;
 
 #[repr(C)]
 pub struct flock {
