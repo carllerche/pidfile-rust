@@ -26,6 +26,10 @@ mod ffi;
 #[path = "ffi_linux.rs"]
 mod ffi;
 
+#[cfg(target_os = "freebsd")]
+#[path = "ffi_linux.rs"]
+mod ffi;
+
 #[cfg(unix)]
 #[path = "file_posix.rs"]
 mod file;
@@ -208,7 +212,6 @@ mod tests {
 		use std::thread;
         use at;
         use tempdir::TempDir;
-        use std::fs::File;
 
         let p = TempDir::new("").expect("create temp dir");
 
