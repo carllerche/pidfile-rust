@@ -18,15 +18,11 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
 #[path = "ffi_darwin.rs"]
 mod ffi;
 
 #[cfg(target_os = "linux")]
-#[path = "ffi_linux.rs"]
-mod ffi;
-
-#[cfg(target_os = "freebsd")]
 #[path = "ffi_linux.rs"]
 mod ffi;
 
