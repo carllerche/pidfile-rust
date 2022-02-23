@@ -56,7 +56,7 @@ macro_rules! nix_check {
         let mut ret;
 
         loop {
-            let res = unsafe { $expr };
+            let res = $expr;
 
             debug!("ffi; expr={}; success={}", stringify!($expr), res.is_ok());
 
@@ -174,16 +174,5 @@ impl Drop for File {
 }
 
 fn from_raw_os_error(err: i32) -> io::Error {
-    use std::mem;
-    // TODO: Remove insane hacks once `std::io::Error::from_os_error` lands
-    //       rust-lang/rust#24028
-    #[allow(dead_code)]
-    enum Repr {
-        Os(i32),
-        Custom(*const ()),
-    }
-
-    unsafe {
-        mem::transmute(Repr::Os(err))
-    }
+    io::Error::from_raw_os_error(err)
 }

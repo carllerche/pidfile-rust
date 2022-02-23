@@ -1,12 +1,11 @@
 [package]
 
 name = "pidfile"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
-log = "0.3.0"
-libc = "0.1.6"
-
-[dependencies.nix]
-git = "https://github.com/carllerche/nix-rust"
+log = "0.4.0"
+libc = "0.2.0"
+nix = "0.7.0"
+tempdir = "*"
